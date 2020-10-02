@@ -232,6 +232,8 @@ const defaultValues = () => {
     addonSelected: "WeakAuras",
     reportIsShown: false,
     fetching: false, // use for avoid spamming refresh button and show spinner
+    columnToSort: "modified",
+    sortDescending: false,
     config: {
       // everything in this object will be auto-save and restore
       wowpath: {
@@ -279,14 +281,6 @@ const defaultValues = () => {
     defaultWOWPath: "",
   };
 };
-
-// const filters = {
-//   datetime: (a, b) => {
-//       return DateTime.fromJSDate(b.modified)
-//         .diff(DateTime.fromJSDate(a.modified))
-//         .valueOf();
-//     },
-// }
 
 export default Vue.extend({
   name: "LandingPage",
@@ -374,13 +368,13 @@ export default Vue.extend({
         );
     },
     aurasWithUpdateSortedForView() {
-      return this.aurasWithUpdateForView
-        .slice(0)
-        .sort((a, b) =>
-          DateTime.fromJSDate(b.modified)
-            .diff(DateTime.fromJSDate(a.modified))
-            .valueOf()
-        );
+      console.log(this.auras);
+      return this.aurasWithUpdateForView.slice(0).sort(this.sortFunction);
+      // .sort((a, b) =>
+      //   DateTime.fromJSDate(b.modified)
+      //     .diff(DateTime.fromJSDate(a.modified))
+      //     .valueOf()
+      // );
     },
     aurasSorted() {
       return this.auras
@@ -399,6 +393,7 @@ export default Vue.extend({
         );
     },
     aurasSortedForView() {
+      console.log(this.auras);
       return this.auras
         .filter(
           (aura) =>
@@ -409,11 +404,12 @@ export default Vue.extend({
             ) &&
             aura.auraType === this.addonSelected
         )
-        .sort((a, b) =>
-          DateTime.fromJSDate(b.modified)
-            .diff(DateTime.fromJSDate(a.modified))
-            .valueOf()
-        );
+        .sort(this.sortFunction);
+      // .sort((a, b) =>
+      //   DateTime.fromJSDate(b.modified)
+      //     .diff(DateTime.fromJSDate(a.modified))
+      //     .valueOf()
+      // );
     },
     aurasWithData() {
       return this.auras.filter(
@@ -452,6 +448,27 @@ export default Vue.extend({
           ) &&
           aura.auraType === this.addonSelected
       );
+    },
+    sortFunction() {
+      const dir = this.sortDescending ? -1 : 1;
+
+      if (this.columnToSort == "modified") {
+        return (a, b) => {
+          return (
+            DateTime.fromJSDate(b.modified)
+              .diff(DateTime.fromJSDate(a.modified))
+              .valueOf() * dir
+          );
+        };
+      }
+
+      return (a, b) => {
+        let A = a[this.columnToSort] || "",
+          B = b[this.columnToSort] || "";
+
+        [A, B] = [A, B].map((s) => (s + "").toLocaleString().toLowerCase());
+        return A < B ? -1 * dir : A === B ? 0 : dir;
+      };
     },
     auras: {
       get() {

@@ -3,7 +3,7 @@
     <span class="select-button">
       <p class="configlabel"><slot></slot></p>
       <div class="fakeinput pointer">
-        <span class="wow-path">{{ path }}&nbsp;</span>
+        <span class="wow-path">{{ path }}</span>
       </div>
       <i class="material-icons settings">settings</i>
     </span>
@@ -86,7 +86,6 @@ $border-color-separate: #0d0d0d;
 .settings {
   position: relative;
   top: 5px;
-  vertical-align: middle;
   cursor: pointer;
   margin-left: 4px;
 }
@@ -108,5 +107,9 @@ $border-color-separate: #0d0d0d;
   vertical-align: middle;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.wow-path:empty::before {
+  content: "\00a0";
 }
 </style>

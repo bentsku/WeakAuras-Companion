@@ -314,7 +314,7 @@ p.red {
 }
 
 .material-icons.settings {
-  vertical-align: middle;
+  vertical-align: top;
   position: relative;
   top: 5px;
 }
