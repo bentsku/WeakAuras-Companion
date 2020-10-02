@@ -86,6 +86,7 @@ $border-color-separate: #0d0d0d;
 .settings {
   position: relative;
   top: 5px;
+  vertical-align: middle;
   cursor: pointer;
   margin-left: 4px;
 }
