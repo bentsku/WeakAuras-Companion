@@ -264,6 +264,9 @@ export default Vue.extend({
     checkApiKey() {
       return this.config.wagoApiKey.match(/^[\w\d]{64}$/);
     },
+    test(event) {
+      console.log(event);
+    },
   },
 });
 </script>

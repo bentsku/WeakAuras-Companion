@@ -34,7 +34,10 @@ export function wowDefaultPath() {
 
 export function matchFolderNameInsensitive(folder, name, create) {
   return new Promise((done, err) => {
-    var dir = fs.readdir(folder, (err, items) => {
+    var dir = fs.readdir(folder, (fsErr, items) => {
+      if (items === undefined)
+        return err({ message: `Folder ${folder} doesnt exist` });
+
       for (let i = 0; i < items.length; i++) {
         if (name.toLowerCase() === items[i].toLowerCase()) {
           return done(items[i]);
@@ -56,7 +59,35 @@ export function matchFolderNameInsensitive(folder, name, create) {
         });
         return name;
       }
-      err({ message: `${name} not found at ${folder}` });
+      return err({ message: `${name} not found at ${folder}` });
     });
   });
+}
+
+export async function getAddonFolder(baseDir, addonName) {
+  var addonFolder = baseDir;
+  var addonPath = ["Interface", "AddOns", addonName];
+
+  while (addonPath.length) {
+    var check = addonPath.shift();
+
+    try {
+      var folder = await matchFolderNameInsensitive(
+        addonFolder,
+        check,
+        addonPath.length === 0
+      );
+
+      if (folder) {
+        addonFolder = path.join(addonFolder, folder);
+      } else {
+        return null;
+      }
+    } catch (err) {
+      console.log(err);
+      return null;
+    }
+  }
+  console.log(addonFolder);
+  return addonFolder;
 }

@@ -35,6 +35,7 @@
         </div>
       </header>
       <main>
+        {{ addonSelectedConfig }}
         <template v-if="configStep === 0">
           <div id="selectors">
             <div
@@ -93,6 +94,7 @@
               :sorted-column="sortedColumn"
               :sort-descending="sortDescending"
               :addon-selected-config="addonSelectedConfig"
+              :class="{ hidden: aurasSortedForView.length <= 0 }"
               @sort-by="sortBy"
             />
             <div
@@ -200,7 +202,7 @@ import {
   createSortByAuthor,
   createSortByType,
 } from "./libs/sort";
-import { wowDefaultPath, matchFolderNameInsensitive } from "./libs/utilities";
+import { wowDefaultPath, getAddonFolder } from "./libs/utilities";
 import Button from "./UI/Button.vue";
 import RefreshButton from "./UI/RefreshButton.vue";
 import AuraHeaders from "./UI/AuraHeaders.vue";
@@ -324,7 +326,7 @@ export default Vue.extend({
           dataIndex: null,
           addonDependency: "WeakAuras",
           svPathFunction: this.WeakAurasSaved,
-          isInstalled: this.IsWeakAurasInstalled(),
+          isInstalled: this.isAddonInstalled("WeakAuras"), // promise, doesnt work
           parseFunction: this.parseWeakAurasSVdata,
           hasTypeColumn: false,
         },
@@ -334,7 +336,7 @@ export default Vue.extend({
           dataIndex: "Plater",
           addonDependency: "Plater",
           svPathFunction: this.PlaterSaved,
-          isInstalled: this.IsPlaterInstalled(),
+          isInstalled: this.isAddonInstalled("Plater"), // promise, doesnt work
           parseFunction: this.parsePlaterSVdata,
           hasTypeColumn: true,
         },
@@ -415,22 +417,18 @@ export default Vue.extend({
     },
     auras: {
       get() {
-        return (
-          (this.config.wowpath.valided &&
-            this.config.wowpath.version &&
-            this.accountSelected &&
-            this.accountSelected.auras) ||
-          []
-        );
+        return (this.accountSelected && this.accountSelected.auras) || [];
       },
       set(newValue) {
-        this.$set(this.accountSelected, "auras", newValue);
+        console.log("new aura set ??");
+        this.$set(this.accountSelected, "auras", newValue); // todo
       },
     },
   },
   watch: {
     config: {
       handler() {
+        console.log("update config");
         store.set("config", this.config);
       },
       deep: true,
@@ -706,82 +704,31 @@ export default Vue.extend({
       }
       return false;
     },
-    async IsWeakAurasInstalled(version, account) {
-      let AddonFolder;
+    async isAddonInstalled(addonName, version, account) {
+      if (!addonName) return;
+      let baseAddonFolder;
 
       if (version && account) {
-        AddonFolder = path.join(this.config.wowpath.value, version);
+        baseAddonFolder = path.join(this.config.wowpath.value, version);
       } else if (this.versionSelected && this.accountSelected) {
-        AddonFolder = path.join(
+        baseAddonFolder = path.join(
           this.config.wowpath.value,
           this.config.wowpath.version
         );
       }
 
-      if (AddonFolder) {
-        var AddonPath = ["Interface", "AddOns", "WeakAuras"];
-
-        while (AddonPath.length) {
-          var check = AddonPath.shift();
-          var folder = await matchFolderNameInsensitive(
-            AddonFolder,
-            check,
-            AddonPath.length === 0
-          );
-
-          if (folder) {
-            AddonFolder = path.join(AddonFolder, folder);
-          } else {
-            return false;
-          }
-        }
-        return true;
-      }
-      return false;
-    },
-    async IsPlaterInstalled(version, account) {
-      let AddonFolder;
-
-      if (version && account) {
-        AddonFolder = path.join(this.config.wowpath.value, version);
-      } else if (this.versionSelected && this.accountSelected) {
-        AddonFolder = path.join(
-          this.config.wowpath.value,
-          this.config.wowpath.version
-        );
-      }
-
-      if (AddonFolder) {
-        var AddonPath = ["Interface", "AddOns", "Plater"];
-
-        while (AddonPath.length) {
-          var check = AddonPath.shift();
-          var folder = await matchFolderNameInsensitive(
-            AddonFolder,
-            check,
-            AddonPath.length === 0
-          );
-
-          if (folder) {
-            AddonFolder = path.join(AddonFolder, folder);
-          } else {
-            return false;
-          }
-        }
-        return true;
-      }
-      return false;
-    },
-    getAddonConfig(addonName) {
-      for (let index = 0; index < this.allAddonConfigs.length; index++) {
-        if (
-          this.allAddonConfigs[index].addonName.toLowerCase() ===
-          addonName.toLowerCase()
-        ) {
-          return this.allAddonConfigs[index];
-        }
+      if (baseAddonFolder) {
+        let addonFolder =
+          (await getAddonFolder(baseAddonFolder, addonName)) !== null;
+        return addonFolder;
       }
       return null;
+    },
+    getAddonConfig(addonName) {
+      return this.allAddonConfigs.find(
+        (addonConfig) =>
+          addonConfing.addName.toLowerCase() === addonName.toLowerCase()
+      );
     },
     reset() {
       store.clear();
@@ -809,6 +756,7 @@ export default Vue.extend({
       const tmp = store.get("config");
 
       if (tmp) {
+        // todo, for me if you assign to config you write over the previous saved config ?
         this.config = tmp;
         this.$i18n.locale = this.config.lang;
 
@@ -851,11 +799,9 @@ export default Vue.extend({
             toastObject.goAway(0);
           },
         },
+        ...overrideOptions,
       };
 
-      Object.keys(overrideOptions).forEach((key) => {
-        options[key] = overrideOptions[key];
-      });
       let msg;
 
       if (typeof text === "object") {
@@ -1656,25 +1602,15 @@ export default Vue.extend({
 
       if (this.config.wowpath.valided && this.version !== "") {
         var AddonPath = ["Interface", "AddOns", "WeakAurasCompanion"];
-        var AddonFolder = path.join(
+        var baseAddonFolder = path.join(
           this.config.wowpath.value,
           this.config.wowpath.version
         );
 
-        while (AddonPath.length) {
-          var check = AddonPath.shift();
-          var folder = await matchFolderNameInsensitive(
-            AddonFolder,
-            check,
-            AddonPath.length === 0
-          );
+        var AddonFolder = await getAddonFolder(baseAddonFolder, "Plater");
 
-          if (folder) {
-            AddonFolder = path.join(AddonFolder, folder);
-          } else {
-            throw new Error("errorCantCreateAddon");
-          }
-        }
+        if (AddonFolder == null) throw new Error("errorCantCreateAddon");
+
         // Make data.lua
         let LuaOutput = "-- file generated automatically\n";
         LuaOutput += "WeakAurasCompanion = {\n";
@@ -2004,11 +1940,11 @@ end`,
     backup() {
       this.config.wowpath.versions.forEach((version, versionindex) => {
         version.accounts.forEach((account, accountindex) => {
+          if (typeof account.savedvariableSizeForAddon === "undefined")
+            this.$set(account, "savedvariableSizeForAddon", []);
+
           this.addonsInstalled.forEach((addon) => {
             let lastSavedFileSize = null;
-
-            if (typeof account.savedvariableSizeForAddon === "undefined")
-              this.$set(account, "savedvariableSizeForAddon", []);
 
             const savedData = account.savedvariableSizeForAddon.find(
               (savedAddon) => savedAddon.addonName === addon.addonName
