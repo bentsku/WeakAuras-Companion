@@ -16,18 +16,8 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
-      - uses: actions/cache@v2
-        id: cache-node
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
-
-      - if: steps.cache-node.outputs.cache-hit != 'true'
-        run: npm install
+      - name: Install
+        uses: bahmutov/npm-install@v1
 
       - name: Lint
         run: npm run lint
@@ -38,4 +28,5 @@ jobs:
       - uses: actions/upload-artifact@v2
         name: Upload DMG
         with:
+          name: WeakAuras-Companion-PRCI-dmg
           path: dist_electron/*.dmg

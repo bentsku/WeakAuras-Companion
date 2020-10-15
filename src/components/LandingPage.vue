@@ -1407,6 +1407,7 @@ export default Vue.extend({
                 "error"
               );
               console.log(JSON.stringify(error));
+              this.fetching = false;
 
               // schedule in 30mn on error
               if (this.schedule.id) clearTimeout(this.schedule.id);
@@ -1732,7 +1733,7 @@ export default Vue.extend({
         /* if (this.stash.lenghth > 0) { LuaOutput += "" } */
         const toc =
           AddonFolder.toLowerCase().search("classic") === -1
-            ? "80300"
+            ? "90001"
             : "11305";
         const files = [
           {

@@ -16,18 +16,8 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
-      - uses: actions/cache@v2
-        id: cache-node
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
-
-      - if: steps.cache-node.outputs.cache-hit != 'true'
-        run: npm install
+      - name: Install
+        uses: bahmutov/npm-install@v1
 
       - name: Lint
         run: npm run lint
@@ -38,19 +28,23 @@ jobs:
       - uses: actions/upload-artifact@v2
         name: Upload AppImage
         with:
+          name: WeakAuras-Companion-PRCI-AppImage
           path: dist_electron/*.AppImage
 
       - uses: actions/upload-artifact@v2
         name: Upload Snap
         with:
+          name: WeakAuras-Companion-PRCI-Snap
           path: dist_electron/*.snap
 
       - uses: actions/upload-artifact@v2
         name: Upload deb
         with:
+          name: WeakAuras-Companion-PRCI-deb
           path: dist_electron/*.deb
 
       - uses: actions/upload-artifact@v2
         name: Upload rpm
         with:
+          name: WeakAuras-Companion-PRCI-rpm
           path: dist_electron/*.rpm
