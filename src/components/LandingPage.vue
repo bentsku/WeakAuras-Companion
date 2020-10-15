@@ -35,91 +35,85 @@
         </div>
       </header>
       <main>
-        <div v-if="configStep === 0" id="selectors">
-          <div
-            v-if="config.wowpath.valided && config.wowpath.versions"
-            id="version-selector"
-          >
-            <Dropdown
-              v-model="config.wowpath.version"
-              :options="versionOptions"
-              :label="$t('app.wowpath.version' /* Version */)"
-              @change="compareSVwithWago()"
+        <template v-if="configStep === 0">
+          <div id="selectors">
+            <div
+              v-if="config.wowpath.valided && config.wowpath.versions"
+              id="version-selector"
             >
-            </Dropdown>
-          </div>
-          <div
-            v-if="config.wowpath.valided && versionSelected"
-            id="account-selector"
-          >
-            <Dropdown
-              v-model="versionSelected.account"
-              :options="accountOptions"
-              :label="$t('app.wowpath.account' /* Account */)"
-              @change="compareSVwithWago()"
+              <Dropdown
+                v-model="config.wowpath.version"
+                :options="versionOptions"
+                :label="$t('app.wowpath.version' /* Version */)"
+                @change="compareSVwithWago()"
+              >
+              </Dropdown>
+            </div>
+            <div
+              v-if="config.wowpath.valided && versionSelected"
+              id="account-selector"
             >
-            </Dropdown>
+              <Dropdown
+                v-model="versionSelected.account"
+                :options="accountOptions"
+                :label="$t('app.wowpath.account' /* Account */)"
+                @change="compareSVwithWago()"
+              >
+              </Dropdown>
+            </div>
           </div>
-        </div>
-        <div
-          v-if="configStep === 0 && allAddonConfigs.length > 1"
-          id="addonbttns"
-        >
-          <label :key="addonSelected" class="btn-label">
-            {{ $t("app.main.addons" /* Addons */) }}
-          </label>
-          <span style="margin-left: 5px" />
-          <Button
-            v-for="(addon, index) in allAddonConfigs"
-            :key="index"
-            type="addon"
-            :class="{ active: addonSelected === addon.addonName }"
-            :disabled="!addon.isInstalled"
-            @click="addonSelected = addon.addonName"
-          >
-            {{ addon.addonName }}
-          </Button>
-        </div>
-        <div v-if="configStep === 0" id="dashboard">
-          <RefreshButton
-            :is-settings-ok="config.wowpath.valided"
-            :is-version-selected="versionSelected"
-            :is-account-selected="accountSelected"
-            :is-sv-ok="WeakAurasSaved() || PlaterSaved()"
-            :fetching="fetching"
-            :last-update="accountSelected && accountSelected.lastWagoUpdate"
-            :auras-shown="
-              config.showAllAuras
-                ? aurasSortedForView.length
-                : aurasWithUpdateSortedForView.length
-            "
-          ></RefreshButton>
-          <br />
-          <div
-            id="aura-list"
-            :class="{
-              hidden: config.showAllAuras
-                ? aurasSortedForView.length <= 0
-                : aurasWithUpdateSortedForView.length <= 0,
-            }"
-          >
-            <Aura
-              v-for="aura in config.showAllAuras
-                ? aurasSortedForView
-                : aurasWithUpdateSortedForView"
-              :key="aura.slug"
-              :aura="aura"
-              :show-all-auras="config.showAllAuras"
-            ></Aura>
+          <div v-if="allAddonConfigs.length > 1" id="addonbttns">
+            <label :key="addonSelected" class="btn-label">
+              {{ $t("app.main.addons" /* Addons */) }}
+            </label>
+            <span style="margin-left: 5px" />
+            <Button
+              v-for="(addon, index) in allAddonConfigs"
+              :key="index"
+              type="addon"
+              :class="{ active: addonSelected === addon.addonName }"
+              :disabled="!addon.isInstalled"
+              @click="addonSelected = addon.addonName"
+            >
+              {{ addon.addonName }}
+            </Button>
           </div>
-        </div>
+          <div id="dashboard">
+            <RefreshButton
+              :is-settings-ok="config.wowpath.valided"
+              :is-version-selected="versionSelected"
+              :is-account-selected="accountSelected"
+              :is-sv-ok="WeakAurasSaved() || PlaterSaved()"
+              :fetching="fetching"
+              :last-update="accountSelected && accountSelected.lastWagoUpdate"
+              :auras-shown="aurasSortedForView.length"
+            ></RefreshButton>
+            <br />
+            <template v-if="aurasSortedForView.length > 0">
+              <AuraHeaders
+                :sorted-column="sortedColumn"
+                :sort-descending="sortDescending"
+                :addon-selected-config="addonSelectedConfig"
+                @sort-by="sortBy"
+              />
+              <div id="aura-list">
+                <Aura
+                  v-for="aura in aurasSortedForView"
+                  :key="aura.slug"
+                  :aura="aura"
+                  :show-all-auras="config.showAllAuras"
+                ></Aura>
+              </div>
+            </template>
+          </div>
+        </template>
         <Config
-          v-if="configStep === 1"
+          v-else-if="configStep === 1"
           :config="config"
           :default-w-o-w-path="defaultWOWPath"
         ></Config>
-        <Help v-if="configStep === 2"></Help>
-        <About v-if="configStep === 3"></About>
+        <Help v-else-if="configStep === 2"></Help>
+        <About v-else-if="configStep === 3"></About>
       </main>
       <footer>
         <a
@@ -198,9 +192,17 @@ import {
   afterReload as afterWOWReload,
   afterRestart as afterWOWRestart,
 } from "./libs/wowstat";
+import {
+  createSortByTime,
+  createSortByString,
+  createSortByUpdate,
+  createSortByAuthor,
+  createSortByType,
+} from "./libs/sort";
 import { wowDefaultPath, matchFolderNameInsensitive } from "./libs/utilities";
 import Button from "./UI/Button.vue";
 import RefreshButton from "./UI/RefreshButton.vue";
+import AuraHeaders from "./UI/AuraHeaders.vue";
 import Aura from "./UI/Aura.vue";
 import Config from "./UI/Config.vue";
 import About from "./UI/About.vue";
@@ -210,7 +212,6 @@ import Report from "./UI/Report.vue";
 import Stash from "./UI/Stash.vue";
 import Dropdown from "./UI/Dropdown.vue";
 
-const { DateTime } = require("luxon");
 const userDataPath = require("electron").remote.app.getPath("userData");
 const fs = require("fs");
 const luaparse = require("luaparse");
@@ -232,7 +233,7 @@ const defaultValues = () => {
     addonSelected: "WeakAuras",
     reportIsShown: false,
     fetching: false, // use for avoid spamming refresh button and show spinner
-    columnToSort: "modified",
+    sortedColumn: "modified",
     sortDescending: false,
     config: {
       // everything in this object will be auto-save and restore
@@ -287,6 +288,7 @@ export default Vue.extend({
   components: {
     RefreshButton,
     Aura,
+    AuraHeaders,
     Config,
     About,
     Help,
@@ -323,6 +325,7 @@ export default Vue.extend({
           svPathFunction: this.WeakAurasSaved,
           isInstalled: this.IsWeakAurasInstalled(),
           parseFunction: this.parseWeakAurasSVdata,
+          hasTypeColumn: false,
         },
         {
           addonName: "Plater",
@@ -332,6 +335,7 @@ export default Vue.extend({
           svPathFunction: this.PlaterSaved,
           isInstalled: this.IsPlaterInstalled(),
           parseFunction: this.parsePlaterSVdata,
+          hasTypeColumn: true,
         },
       ];
       return addonConfigs;
@@ -339,6 +343,14 @@ export default Vue.extend({
     addonsInstalled() {
       return this.allAddonConfigs.filter(
         (addonConfig) => addonConfig.isInstalled
+      );
+    },
+    addonSelectedConfig() {
+      if (!this.addonSelected) return null;
+      return this.allAddonConfigs.find(
+        (addonConfig) =>
+          addonConfig.addonName.toLowerCase() ===
+          this.addonSelected.toLowerCase()
       );
     },
     versionSelected() {
@@ -358,59 +370,6 @@ export default Vue.extend({
         )
       );
     },
-    aurasWithUpdateSorted() {
-      return this.aurasWithUpdate
-        .slice(0)
-        .sort((a, b) =>
-          DateTime.fromJSDate(b.modified)
-            .diff(DateTime.fromJSDate(a.modified))
-            .valueOf()
-        );
-    },
-    aurasWithUpdateSortedForView() {
-      console.log(this.auras);
-      return this.aurasWithUpdateForView.slice(0).sort(this.sortFunction);
-      // .sort((a, b) =>
-      //   DateTime.fromJSDate(b.modified)
-      //     .diff(DateTime.fromJSDate(a.modified))
-      //     .valueOf()
-      // );
-    },
-    aurasSorted() {
-      return this.auras
-        .filter(
-          (aura) =>
-            (!!aura.topLevel || aura.regionType !== "group") &&
-            !(
-              this.config.ignoreOwnAuras &&
-              aura.author === this.config.wagoUsername
-            )
-        )
-        .sort((a, b) =>
-          DateTime.fromJSDate(b.modified)
-            .diff(DateTime.fromJSDate(a.modified))
-            .valueOf()
-        );
-    },
-    aurasSortedForView() {
-      console.log(this.auras);
-      return this.auras
-        .filter(
-          (aura) =>
-            (!!aura.topLevel || aura.regionType !== "group") &&
-            !(
-              this.config.ignoreOwnAuras &&
-              aura.author === this.config.wagoUsername
-            ) &&
-            aura.auraType === this.addonSelected
-        )
-        .sort(this.sortFunction);
-      // .sort((a, b) =>
-      //   DateTime.fromJSDate(b.modified)
-      //     .diff(DateTime.fromJSDate(a.modified))
-      //     .valueOf()
-      // );
-    },
     aurasWithData() {
       return this.auras.filter(
         (aura) =>
@@ -423,52 +382,35 @@ export default Vue.extend({
       );
     },
     aurasWithUpdate() {
-      return this.auras.filter(
-        (aura) =>
-          !!aura.encoded &&
-          aura.wagoVersion > aura.version &&
-          !aura.ignoreWagoUpdate &&
-          (!!aura.topLevel || aura.regionType !== "group") &&
-          !(
-            this.config.ignoreOwnAuras &&
-            aura.author === this.config.wagoUsername
-          )
+      return this.aurasWithData.filter(
+        (aura) => aura.wagoVersion > aura.version && !aura.ignoreWagoUpdate
       );
     },
-    aurasWithUpdateForView() {
-      return this.auras.filter(
-        (aura) =>
-          !!aura.encoded &&
-          aura.wagoVersion > aura.version &&
-          !aura.ignoreWagoUpdate &&
-          (!!aura.topLevel || aura.regionType !== "group") &&
-          !(
-            this.config.ignoreOwnAuras &&
-            aura.author === this.config.wagoUsername
-          ) &&
-          aura.auraType === this.addonSelected
-      );
+    aurasSortedForView() {
+      const auras = this.config.showAllAuras
+        ? this.aurasWithData
+        : this.aurasWithUpdate;
+      return auras
+        .filter((aura) => aura.auraType === this.addonSelected)
+        .sort(this.sortFunction);
     },
     sortFunction() {
       const dir = this.sortDescending ? -1 : 1;
+      const showAllAuras = this.config.showAllAuras;
+      const hasTypeColumn =
+        this.addonSelectedConfig && this.addonSelectedConfig.hasTypeColumn;
 
-      if (this.columnToSort == "modified") {
-        return (a, b) => {
-          return (
-            DateTime.fromJSDate(b.modified)
-              .diff(DateTime.fromJSDate(a.modified))
-              .valueOf() * dir
-          );
-        };
+      if (!this.sortedColumn || this.sortedColumn === "modified")
+        return createSortByTime(dir);
+      else if (this.sortedColumn === "auraTypeDisplay") {
+        return createSortByType(dir);
+      } else if (this.sortedColumn === "update") {
+        return createSortByUpdate(dir, showAllAuras, hasTypeColumn);
+      } else if (this.sortedColumn === "author") {
+        return createSortByAuthor(dir, hasTypeColumn);
       }
 
-      return (a, b) => {
-        let A = a[this.columnToSort] || "",
-          B = b[this.columnToSort] || "";
-
-        [A, B] = [A, B].map((s) => (s + "").toLocaleString().toLowerCase());
-        return A < B ? -1 * dir : A === B ? 0 : dir;
-      };
+      return createSortByString(dir, this.sortedColumn);
     },
     auras: {
       get() {
@@ -1518,6 +1460,7 @@ export default Vue.extend({
                 "error"
               );
               console.log(JSON.stringify(error));
+              this.fetching = false;
 
               // schedule in 30mn on error
               if (this.schedule.id) clearTimeout(this.schedule.id);
@@ -1551,133 +1494,154 @@ export default Vue.extend({
       Promise.all(promisesWagoCallsComplete).then(() => {
         console.log("promisesWagoCallsComplete");
 
-        Promise.all(promisesWagoDataCallsComplete).then(() => {
-          console.log("promisesWagoDataCallsComplete");
+        Promise.all(promisesWagoDataCallsComplete)
+          .then(() => {
+            console.log("promisesWagoDataCallsComplete");
 
-          // Test if list is empty
-          if (allAurasFetched.length === 0) {
-            this.message(
-              this.$t("app.main.nothingToFetch" /* No updates available */)
-            );
-
-            this.$set(this.accountSelected, "lastWagoUpdate", new Date());
-
-            if (this.schedule.id) clearTimeout(this.schedule.id);
-
-            this.schedule.id = setTimeout(
-              this.compareSVwithWago,
-              1000 * 60 * 60
-            );
-            return;
-          }
-
-          // catch response error
-          const promisesResolved = promisesWagoDataCallsComplete.map(
-            (promise) =>
-              promise.catch((err2) => ({
-                config: { params: { id: err2.config.params.id } },
-                status: err2.response.status,
-              }))
-          );
-
-          this.$http
-            .all(promisesResolved)
-            .then(
-              this.$http.spread((...args) => {
-                args.forEach((arg) => {
-                  const { id } = arg.config.params;
-
-                  if (arg.status === 200) {
-                    this.auras.forEach((aura, index) => {
-                      if (aura.wagoid === id) {
-                        news.push(aura.name);
-                        this.auras[index].encoded = arg.data;
-                      }
-                    });
-                  } else {
-                    this.auras.forEach((aura) => {
-                      if (aura.wagoid === id) {
-                        this.message(
-                          [
-                            this.$t(
-                              "app.main.stringReceiveError-1",
-                              {
-                                aura: aura.name,
-                              } /* Error receiving encoded string for {aura} */
-                            ),
-                            this.$t(
-                              "app.main.stringReceiveError-2",
-                              {
-                                status: arg.status,
-                              } /* http code: {status} */
-                            ),
-                          ],
-                          "error"
-                        );
-                        fails.push(aura.name);
-                      }
-                    });
-                  }
-                });
-              })
-            )
-            .catch((error) => {
+            // Test if list is empty
+            if (allAurasFetched.length === 0) {
               this.message(
-                [
-                  this.$t(
-                    "app.main.errorWagoAnswer" /* Can't read Wago answer */
-                  ),
-                  error,
-                ],
-                "error"
+                this.$t("app.main.nothingToFetch" /* No updates available */)
               );
-              console.log(JSON.stringify(error));
 
-              // schedule in 30mn on error
+              this.$set(this.accountSelected, "lastWagoUpdate", new Date());
+
               if (this.schedule.id) clearTimeout(this.schedule.id);
 
               this.schedule.id = setTimeout(
                 this.compareSVwithWago,
-                1000 * 60 * 30
+                1000 * 60 * 60
               );
-            })
-            .then(() => {
-              //console.log(allAurasFetched);
-              //console.log(received);
-              // console.log(`allAurasFetched: ${JSON.stringify(allAurasFetched)}`);
-              // console.log(`received: ${JSON.stringify(received)}`);
-              allAurasFetched.forEach((toFetch) => {
-                if (received.indexOf(toFetch) === -1) {
-                  // no data received for this aura => remove from list
-                  this.auras.forEach((aura, index) => {
-                    if (aura && aura.slug === toFetch) {
-                      console.log(`no data received for ${aura.slug}`);
-                      this.auras.splice(index, 1);
+              return;
+            }
+
+            // catch response error
+            const promisesResolved = promisesWagoDataCallsComplete.map(
+              (promise) =>
+                promise.catch((err2) => ({
+                  config: { params: { id: err2.config.params.id } },
+                  status: err2.response.status,
+                }))
+            );
+
+            this.$http
+              .all(promisesResolved)
+              .then(
+                this.$http.spread((...args) => {
+                  args.forEach((arg) => {
+                    const { id } = arg.config.params;
+
+                    if (arg.status === 200) {
+                      this.auras.forEach((aura, index) => {
+                        if (aura.wagoid === id) {
+                          news.push(aura.name);
+                          this.auras[index].encoded = arg.data;
+                        }
+                      });
+                    } else {
+                      this.auras.forEach((aura) => {
+                        if (aura.wagoid === id) {
+                          this.message(
+                            [
+                              this.$t(
+                                "app.main.stringReceiveError-1",
+                                {
+                                  aura: aura.name,
+                                } /* Error receiving encoded string for {aura} */
+                              ),
+                              this.$t(
+                                "app.main.stringReceiveError-2",
+                                {
+                                  status: arg.status,
+                                } /* http code: {status} */
+                              ),
+                            ],
+                            "error"
+                          );
+                          fails.push(aura.name);
+                        }
+                      });
                     }
                   });
-                }
-              });
+                })
+              )
+              .catch((error) => {
+                this.message(
+                  [
+                    this.$t(
+                      "app.main.errorWagoAnswer" /* Can't read Wago answer */
+                    ),
+                    error,
+                  ],
+                  "error"
+                );
+                console.log(JSON.stringify(error));
 
-              // we are done with wago API, update data.lua
-
-              try {
-                this.writeAddonData(news, fails);
-              } finally {
-                this.fetching = false;
-
-                this.setFirstAddonInstalledSelected();
-
-                this.$set(this.accountSelected, "lastWagoUpdate", new Date());
-
+                // schedule in 30mn on error
                 if (this.schedule.id) clearTimeout(this.schedule.id);
 
                 this.schedule.id = setTimeout(
                   this.compareSVwithWago,
-                  1000 * 60 * 60
+                  1000 * 60 * 30
                 );
-              }
-            });
-        });
+              })
+              .then(() => {
+                //console.log(allAurasFetched);
+                //console.log(received);
+                // console.log(`allAurasFetched: ${JSON.stringify(allAurasFetched)}`);
+                // console.log(`received: ${JSON.stringify(received)}`);
+                allAurasFetched.forEach((toFetch) => {
+                  if (received.indexOf(toFetch) === -1) {
+                    // no data received for this aura => remove from list
+                    this.auras.forEach((aura, index) => {
+                      if (aura && aura.slug === toFetch) {
+                        console.log(`no data received for ${aura.slug}`);
+                        this.auras.splice(index, 1);
+                      }
+                    });
+                  }
+                });
+
+                // we are done with wago API, update data.lua
+
+                try {
+                  this.writeAddonData(news, fails);
+                } finally {
+                  this.fetching = false;
+
+                  this.setFirstAddonInstalledSelected();
+
+                  this.$set(this.accountSelected, "lastWagoUpdate", new Date());
+
+                  if (this.schedule.id) clearTimeout(this.schedule.id);
+
+                  this.schedule.id = setTimeout(
+                    this.compareSVwithWago,
+                    1000 * 60 * 60
+                  );
+                }
+              });
+          })
+          .catch((error) => {
+            this.message(
+              [
+                this.$t(
+                  "app.main.errorWagoAnswer" /* Can't read Wago answer */
+                ),
+                error,
+              ],
+              "error"
+            );
+            console.log(JSON.stringify(error));
+
+            // schedule in 30mn on error
+            if (this.schedule.id) clearTimeout(this.schedule.id);
+
+            this.schedule.id = setTimeout(
+              this.compareSVwithWago,
+              1000 * 60 * 30
+            );
+          });
       });
     },
     toggleReport() {
@@ -1832,7 +1796,7 @@ export default Vue.extend({
         /* if (this.stash.lenghth > 0) { LuaOutput += "" } */
         const toc =
           AddonFolder.toLowerCase().search("classic") === -1
-            ? "80300"
+            ? "90001"
             : "11305";
         const files = [
           {
@@ -2258,6 +2222,19 @@ end`,
             }
           });
         }
+      }
+    },
+    sortBy(columnName) {
+      if (this.sortedColumn == columnName) {
+        if (this.sortDescending) {
+          this.sortDescending = false;
+          this.sortedColumn = "modified";
+        } else {
+          this.sortDescending = true;
+        }
+      } else {
+        this.sortDescending = false;
+        this.sortedColumn = columnName;
       }
     },
   },
