@@ -32,10 +32,15 @@
             @click="configStep = 3"
             >{{ $t("app.menu.about" /* About */) }}</Button
           >
+          <Button
+            type="menu"
+            :class="{ active: configStep === 4 }"
+            @click="configStep = 4"
+            >Test</Button
+          >
         </div>
       </header>
       <main>
-        {{ addonSelectedConfig }}
         <template v-if="configStep === 0">
           <div id="selectors">
             <div
@@ -117,6 +122,7 @@
         ></Config>
         <Help v-else-if="configStep === 2"></Help>
         <About v-else-if="configStep === 3"></About>
+        <test-config v-else-if="configStep === 4" :config="config" />
       </main>
       <footer>
         <a
@@ -202,7 +208,7 @@ import {
   createSortByAuthor,
   createSortByType,
 } from "./libs/sort";
-import { wowDefaultPath, getAddonFolder } from "./libs/utilities";
+import { syncWowDefaultPath, syncGetAddonFolder } from "./libs/utilities";
 import Button from "./UI/Button.vue";
 import RefreshButton from "./UI/RefreshButton.vue";
 import AuraHeaders from "./UI/AuraHeaders.vue";
@@ -214,6 +220,8 @@ import TitleBar from "./UI/TitleBar.vue";
 import Report from "./UI/Report.vue";
 import Stash from "./UI/Stash.vue";
 import Dropdown from "./UI/Dropdown.vue";
+
+import TestConfig from "./UI/TestConfig.vue";
 
 const userDataPath = require("electron").remote.app.getPath("userData");
 const fs = require("fs");
@@ -243,10 +251,28 @@ const defaultValues = () => {
       wowpath: {
         value: "",
         versions: [],
-        version: "",
+        selectedVersion: "",
         valided: false,
       },
-      wagoUsername: null, // ignore your own auras
+      wowPath: "",
+      addonData: {
+        versions: [],
+        selectedVersion: "",
+      },
+      globalSettings: {
+        wagoUsername: null,
+        wagoApiKey: null,
+        ignoreOwnAuras: true,
+        autostart: false,
+        startminimize: false,
+        notify: false,
+        lang: "en",
+        showAllAuras: false,
+        autoupdate: false,
+        beta: null,
+        internalVersion,
+      },
+      wagoUsername: null,
       wagoApiKey: null,
       ignoreOwnAuras: true,
       autostart: false,
@@ -300,6 +326,7 @@ export default Vue.extend({
     Stash,
     Button,
     Dropdown,
+    TestConfig,
   },
   data() {
     return defaultValues();
@@ -595,14 +622,13 @@ export default Vue.extend({
 
     // set default wow path
     if (!this.config.wowpath.valided) {
-      wowDefaultPath().then((value) => {
-        this.defaultWOWPath = value;
+      const wowPath = syncWowDefaultPath();
+      this.defaultWOWPath = wowPath;
 
-        if (!this.config.wowpath.valided) {
-          this.config.wowpath.value = value;
-          this.validateWowpath();
-        }
-      });
+      if (!this.config.wowpath.valided) {
+        this.config.wowpath.value = wowPath;
+        this.validateWowpath();
+      }
     } else {
       this.validateWowpath();
     }
@@ -704,7 +730,7 @@ export default Vue.extend({
       }
       return false;
     },
-    async isAddonInstalled(addonName, version, account) {
+    isAddonInstalled(addonName, version, account) {
       if (!addonName) return;
       let baseAddonFolder;
 
@@ -718,9 +744,7 @@ export default Vue.extend({
       }
 
       if (baseAddonFolder) {
-        let addonFolder =
-          (await getAddonFolder(baseAddonFolder, addonName)) !== null;
-        return addonFolder;
+        return syncGetAddonFolder(baseAddonFolder, addonName) !== null;
       }
       return null;
     },
@@ -737,10 +761,9 @@ export default Vue.extend({
       this.config = config;
       this.config.beta = beta;
 
-      wowDefaultPath().then((value) => {
-        this.config.wowpath.value = value;
-        this.validateWowpath();
-      });
+      const wowPath = syncWowDefaultPath();
+      this.config.wowpath.value = wowPath;
+      this.validateWowpath();
 
       this.message(
         this.$t(
@@ -780,9 +803,8 @@ export default Vue.extend({
             this.config.wowpath.valided = false;
             this.config.account = null;
 
-            wowDefaultPath().then((value) => {
-              this.config.wowpath.value = value;
-            });
+            const wowPath = syncWowDefaultPath();
+            this.config.wowpath.value = wowPath;
           }
           this.config.internalVersion = internalVersion;
         }
@@ -921,7 +943,6 @@ export default Vue.extend({
           ),
           "error"
         );
-        //this.fetching = false;
         return [];
       }
 
@@ -947,40 +968,37 @@ export default Vue.extend({
             let uid = null;
             let topLevel = true;
 
-            obj2.value.fields.forEach((obj3) => {
-              if (obj3.key.value === "id") {
-                id = obj3.value.value;
-              }
+            obj2.value.fields.forEach(({ key, value }) => {
+              switch (key.value) {
+                case "id":
+                  id = value.value;
+                  break;
+                case "uid":
+                  uid = value.value;
+                  break;
+                case "version":
+                  version = Number(value.value);
+                  break;
+                case "semver":
+                  semver = value.value;
+                  break;
+                case "ignoreWagoUpdate":
+                  ignoreWagoUpdate = value.value;
+                  break;
+                case "skipWagoUpdate":
+                  skipWagoUpdate = value.value;
+                  break;
 
-              if (obj3.key.value === "uid") {
-                uid = obj3.value.value;
-              }
+                case "url": {
+                  url = value.value;
+                  const result = url.match(pattern);
 
-              if (obj3.key.value === "version") {
-                version = Number(obj3.value.value);
-              }
-
-              if (obj3.key.value === "semver") {
-                semver = obj3.value.value;
-              }
-
-              if (obj3.key.value === "ignoreWagoUpdate") {
-                ignoreWagoUpdate = obj3.value.value;
-              }
-
-              if (obj3.key.value === "skipWagoUpdate") {
-                skipWagoUpdate = obj3.value.value;
-              }
-
-              if (obj3.key.value === "url") {
-                url = obj3.value.value;
-                const result = url.match(pattern);
-
-                if (result) ({ 2: slug } = url.match(pattern));
-              }
-
-              if (obj3.key.value === "parent") {
-                topLevel = false;
+                  if (result) ({ 2: slug } = result);
+                  break;
+                }
+                case "parent":
+                  topLevel = false;
+                  break;
               }
             });
 
@@ -1006,9 +1024,7 @@ export default Vue.extend({
                 regionType: null,
                 auraType: config.addonName,
                 auraTypeDisplay: null,
-                addonConfig: config,
               };
-
               aurasFromFile.push(foundAura);
             }
           });
@@ -1045,108 +1061,106 @@ export default Vue.extend({
             let profid;
 
             profile.value.fields.forEach((profData) => {
-              if (profData.key.value === "Name") {
-                profid = profData.value.value;
-              }
+              switch (profData.key.value) {
+                case "Name":
+                  profid = profData.value.value;
+                  break;
+                case "version":
+                  profversion = Number(profData.value.value);
+                  break;
+                case "semver":
+                  profsemver = profData.value.value;
+                  break;
+                case "ignoreWagoUpdate":
+                  profignoreWagoUpdate = profData.value.value;
+                  break;
+                case "skipWagoUpdate":
+                  profskipWagoUpdate = profData.value.value;
+                  break;
 
-              if (profData.key.value === "version") {
-                profversion = Number(profData.value.value);
-              }
+                case "url": {
+                  profurl = profData.value.value;
+                  const result = profurl.match(pattern);
 
-              if (profData.key.value === "semver") {
-                profsemver = profData.value.value;
-              }
+                  if (result) ({ 2: profslug } = result);
+                  break;
+                }
+                case "script_data":
 
-              if (profData.key.value === "ignoreWagoUpdate") {
-                profignoreWagoUpdate = profData.value.value;
-              }
+                case "hook_data": {
+                  let typeSuffix =
+                    profData.key.value === "hook_data"
+                      ? "-Mod"
+                      : profData.key.value === "script_data"
+                      ? "-Script"
+                      : "";
 
-              if (profData.key.value === "skipWagoUpdate") {
-                profskipWagoUpdate = profData.value.value;
-              }
+                  profData.value.fields.forEach((obj2) => {
+                    let slug;
+                    let url;
+                    let version = 0;
+                    let semver;
+                    let ignoreWagoUpdate = false;
+                    let skipWagoUpdate = null;
+                    let id;
 
-              if (profData.key.value === "url") {
-                profurl = profData.value.value;
-                const result = profurl.match(pattern);
+                    obj2.value.fields.forEach(({ key, value }) => {
+                      switch (key.value) {
+                        case "Name":
+                          id = value.value;
+                          break;
+                        case "version":
+                          version = Number(value.value);
+                          break;
+                        case "semver":
+                          semver = value.value;
+                          break;
+                        case "ignoreWagoUpdate":
+                          ignoreWagoUpdate = value.value;
+                          break;
+                        case "skipWagoUpdate":
+                          skipWagoUpdate = value.value;
+                          break;
 
-                if (result) ({ 2: profslug } = profurl.match(pattern));
-              }
+                        case "url": {
+                          url = value.value;
+                          const result = url.match(pattern);
 
-              if (
-                profData.key.value === "script_data" ||
-                profData.key.value === "hook_data"
-              ) {
-                let typeSuffix =
-                  (profData.key.value === "hook_data" && "-Mod") ||
-                  (profData.key.value === "script_data" && "-Script") ||
-                  "";
+                          if (result) ({ 2: slug } = result);
+                          break;
+                        }
+                      }
+                    });
 
-                profData.value.fields.forEach((obj2) => {
-                  let slug;
-                  let url;
-                  let version = 0;
-                  let semver;
-                  let ignoreWagoUpdate = false;
-                  let skipWagoUpdate = null;
-                  let id;
+                    if (slug) {
+                      const foundAura = {
+                        id,
+                        slug,
+                        version,
+                        semver,
+                        ignoreWagoUpdate,
+                        skipWagoUpdate,
+                        wagoVersion: null,
+                        wagoSemver: null,
+                        changelog: null,
+                        created: null,
+                        modified: null,
+                        author: null,
+                        encoded: null,
+                        wagoid: null,
+                        ids: [id],
+                        topLevel: true,
+                        uids: [],
+                        regionType: null,
+                        auraType: config.addonName,
+                        auraTypeDisplay: config.addonName + typeSuffix,
+                        addonConfig: config,
+                      };
 
-                  obj2.value.fields.forEach((obj3) => {
-                    if (obj3.key.value === "Name") {
-                      id = obj3.value.value;
-                    }
-
-                    if (obj3.key.value === "version") {
-                      version = Number(obj3.value.value);
-                    }
-
-                    if (obj3.key.value === "semver") {
-                      semver = obj3.value.value;
-                    }
-
-                    if (obj3.key.value === "ignoreWagoUpdate") {
-                      ignoreWagoUpdate = obj3.value.value;
-                    }
-
-                    if (obj3.key.value === "skipWagoUpdate") {
-                      skipWagoUpdate = obj3.value.value;
-                    }
-
-                    if (obj3.key.value === "url") {
-                      url = obj3.value.value;
-                      const result = url.match(pattern);
-
-                      if (result) ({ 2: slug } = url.match(pattern));
+                      aurasFromFile.push(foundAura);
                     }
                   });
-
-                  if (slug) {
-                    const foundAura = {
-                      id,
-                      slug,
-                      version,
-                      semver,
-                      ignoreWagoUpdate,
-                      skipWagoUpdate,
-                      wagoVersion: null,
-                      wagoSemver: null,
-                      changelog: null,
-                      created: null,
-                      modified: null,
-                      author: null,
-                      encoded: null,
-                      wagoid: null,
-                      ids: [id],
-                      topLevel: true,
-                      uids: [],
-                      regionType: null,
-                      auraType: config.addonName,
-                      auraTypeDisplay: config.addonName + typeSuffix,
-                      addonConfig: config,
-                    };
-
-                    aurasFromFile.push(foundAura);
-                  }
-                });
+                }
               }
             });
 
@@ -1280,7 +1294,6 @@ export default Vue.extend({
               //ensure config
               this.auras[index].auraType = foundAura.auraType;
               this.auras[index].auraTypeDisplay = foundAura.auraTypeDisplay;
-              this.auras[index].addonConfig = foundAura.addonConfig;
             }
           });
         }
@@ -1314,7 +1327,7 @@ export default Vue.extend({
                 this.config.ignoreOwnAuras &&
                 !!aura.author &&
                 aura.author === this.config.wagoUsername
-              ) && aura.addonConfig === config
+              ) && aura.auraType === config.addonName
           )
           .map((aura) => aura.slug);
 
@@ -1602,13 +1615,16 @@ export default Vue.extend({
       const addonConfigs = this.addonsInstalled;
 
       if (this.config.wowpath.valided && this.version !== "") {
-        var AddonPath = ["Interface", "AddOns", "WeakAurasCompanion"];
         var baseAddonFolder = path.join(
           this.config.wowpath.value,
           this.config.wowpath.version
         );
 
-        var AddonFolder = await getAddonFolder(baseAddonFolder, "Plater");
+        var AddonFolder = syncGetAddonFolder(
+          baseAddonFolder,
+          "WeakAurasCompanion",
+          true
+        );
 
         if (AddonFolder == null) throw new Error("errorCantCreateAddon");
 

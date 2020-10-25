@@ -32,6 +32,20 @@ export function wowDefaultPath() {
   });
 }
 
+export function syncWowDefaultPath() {
+  if (process.platform === "win32") {
+    const key =
+      "HKLM\\SOFTWARE\\WOW6432Node\\Blizzard Entertainment\\World of Warcraft";
+
+    regedit.list(key, (err, result) => {
+      if (err) throw err;
+      else {
+        return path.join(result[key].values.InstallPath.value, "..");
+      }
+    });
+  } else return "";
+}
+
 export function matchFolderNameInsensitive(folder, name, create) {
   return new Promise((done, err) => {
     var dir = fs.readdir(folder, (fsErr, items) => {
@@ -64,6 +78,42 @@ export function matchFolderNameInsensitive(folder, name, create) {
   });
 }
 
+export function syncMatchFolderNameInsensitive(folder, name, create) {
+  console.log(folder, name);
+
+  try {
+    const files = fs.readdirSync(folder);
+    console.log(files);
+
+    if (files === undefined) throw Error(`Folder ${folder} doesnt exist`);
+
+    const folderFound = files.find(
+      (filename) => filename.toLowerCase() === name.toLowerCase()
+    );
+
+    if (folderFound) return folderFound;
+
+    if (!!create) {
+      fs.mkdir(path.join(folder, name), (err) => {
+        if (err && err.code !== "EEXIST") {
+          this.message(
+            this.$t(
+              "app.main.errorCantCreateAddon" /* Can't create addon directory */
+            ),
+            "error"
+          );
+          console.log(JSON.stringify(err));
+          throw new Error("errorCantCreateAddon");
+        }
+      });
+      return name;
+    }
+  } catch (err) {
+    console.log(err);
+    throw Error(`${name} not found at ${folder}`);
+  }
+}
+
 export async function getAddonFolder(baseDir, addonName) {
   var addonFolder = baseDir;
   var addonPath = ["Interface", "AddOns", addonName];
@@ -83,6 +133,27 @@ export async function getAddonFolder(baseDir, addonName) {
       } else {
         return null;
       }
+    } catch (err) {
+      console.log(err);
+      return null;
+    }
+  }
+  console.log(addonFolder);
+  return addonFolder;
+}
+
+export function syncGetAddonFolder(baseDir, addonName, create = false) {
+  let addonFolder = baseDir;
+  const addonPath = ["Interface", "AddOns", addonName];
+
+  while (addonPath.length) {
+    const check = addonPath.shift();
+
+    try {
+      var folder = syncMatchFolderNameInsensitive(addonFolder, check, create);
+
+      if (folder) addonFolder = path.join(addonFolder, folder);
+      else return null;
     } catch (err) {
       console.log(err);
       return null;

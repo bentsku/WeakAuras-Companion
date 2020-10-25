@@ -255,8 +255,12 @@ export default Vue.extend({
   },
   methods: {
     reset() {
+      this.$emit("reset", true);
       this.$parent.reset();
       this.wagoUsername = null;
+    },
+    updateWowPath() {
+      // $emit new wow path here ? to trigger parent validation
     },
     openBackupDir() {
       shell.openPath(this.config.backup.path);
