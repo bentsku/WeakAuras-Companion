@@ -79,11 +79,8 @@ export function matchFolderNameInsensitive(folder, name, create) {
 }
 
 export function syncMatchFolderNameInsensitive(folder, name, create) {
-  console.log(folder, name);
-
   try {
     const files = fs.readdirSync(folder);
-    console.log(files);
 
     if (files === undefined) throw Error(`Folder ${folder} doesnt exist`);
 
@@ -138,7 +135,6 @@ export async function getAddonFolder(baseDir, addonName) {
       return null;
     }
   }
-  console.log(addonFolder);
   return addonFolder;
 }
 
@@ -159,6 +155,5 @@ export function syncGetAddonFolder(baseDir, addonName, create = false) {
       return null;
     }
   }
-  console.log(addonFolder);
   return addonFolder;
 }

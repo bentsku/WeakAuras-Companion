@@ -48,12 +48,11 @@ const joinBySlug = (auraArray) => {
     else auraMap[aura.slug] = aura;
     return auraMap;
   }, {});
-  return [Object.keys(auraMappedBySlug), auraMappedBySlug];
+  return auraMappedBySlug;
 };
 
 const buildAuraList = (parsedAddonData) => {
-  const [slugs, mergedParsed] = joinBySlug(parsedAddonData);
-  // console log ?
+  return joinBySlug(parsedAddonData);
 };
 
 const updateAuraInfoFromWago = (aura, auraInfo) => {
@@ -70,13 +69,49 @@ const updateAuraInfoFromWago = (aura, auraInfo) => {
   };
 };
 
+const getAurasInfoFromWago = (
+  wagoApiUrl,
+  aurasSlug,
+  accountHash,
+  wagoApiKey
+) => {
+  return axios.get(wagoApiUrl, {
+    params: {
+      // !! size of request is not checked, can lead to too long urls
+      ids: aurasSlug.join(),
+    },
+    headers: {
+      Identifier: accountHash,
+      "api-key": wagoApiKey || "",
+    },
+    crossdomain: true,
+  });
+};
+
+const getAuraRawEncoded = (slug, wagoApiKey) => {
+  return axios
+    .get("https://data.wago.io/api/raw/encoded", {
+      params: {
+        // eslint-disable-next-line no-underscore-dangle
+        id: slug,
+      },
+      headers: {
+        Identifier: accountHash,
+        "api-key": wagoApiKey || "",
+      },
+      crossdomain: true,
+    })
+    .catch((err) => ({
+      config: { params: { id: err.config.params.id } },
+      status: err.response.status,
+    }));
+};
+
 const getWagoData = async (
   addonConfigs,
-  slugs,
   auraObject,
   globalSettings,
-  accountHash,
-  message
+  accountHash
 ) => {
   const auras = Object.values(auraObject);
   let allAurasFetched = [];
@@ -91,7 +126,7 @@ const getWagoData = async (
           !!aura.author &&
           aura.author === globalSettings.wagoUsername
         ) &&
-        aura.auraType === config.addonName
+        aura.auraType === addonConf.addonName
       ) {
         accumulator.push(aura.slug);
       }
@@ -102,20 +137,15 @@ const getWagoData = async (
     allAurasFetched = [...allAurasFetched, ...aurasToFetch];
 
     try {
-      const { data } = await axios.get(addonConf.wagoAPI, {
-        params: {
-          // !! size of request is not checked, can lead to too long urls
-          ids: fetchAuras.join(),
-        },
-        headers: {
-          Identifier: accountHash,
-          "api-key": globalSettings.wagoApiKey || "",
-        },
-        crossdomain: true,
-      });
+      const { data: wagoAuras } = getAurasInfoFromWago(
+        addonConf.wagoApi,
+        aurasToFetch,
+        accountHash,
+        globalSettings.wagoApiKey
+      );
 
-      data.forEach((wagoAura) => {
-        received.push(wagoAura._id, wagoAura.slug);
+      wagoAuras.forEach((wagoAura) => {
+        received.push(wagoAura.slug);
         const aura = auraObject[wagoAura.slug];
 
         if (aura) {
@@ -137,34 +167,32 @@ const getWagoData = async (
         ) {
           // push promise ?
           pendingPromisesWagoEncoded.push(
-            axios
-              .get("https://data.wago.io/api/raw/encoded", {
-                params: {
-                  // eslint-disable-next-line no-underscore-dangle
-                  id: wagoAura.slug,
-                },
-                headers: {
-                  Identifier: accountHash,
-                  "api-key": globalSettings.wagoApiKey || "",
-                },
-                crossdomain: true,
-              })
-              .catch((err) => ({
-                config: { params: { id: err.config.params.id } },
-                status: err.response.status,
-              }))
+            getAuraRawEncoded(aura.slug, globalSettings.wagoApiKey)
           );
+
+          auraObject[wagoAura.slug] = {
+            ...aura,
+            wagoVersion: wagoData.version,
+          };
+          // auraObject[wagoAura.slug].wagoVersion = wagoData.version;
+          // aura.wagoVersion = wagoData.version
         }
       });
     } catch (err) {
       throw Error("app.main.errorWagoAnswer");
     }
   });
+  const notReceived = allAurasFetched.filter((slug) => received.includes(slug));
 
-  return { pending: pendingPromisesWagoEncoded, received, allAurasFetched };
+  notReceived.forEach((slug) => {
+    delete auraObject[slug];
+    console.log(`no data received for ${slug}`);
+  });
+
+  return pendingPromisesWagoEncoded;
 };
 
-const updateAurasString = async (pendingPromises, aurasMap) => {
+const updateAurasEncodedString = async (pendingPromises, aurasMap, msg, tr) => {
   const news = [];
   const fails = [];
   const wagoResponses = await Promise.all(pendingPromises);
@@ -175,17 +203,18 @@ const updateAurasString = async (pendingPromises, aurasMap) => {
 
     if (wagoResp.status === 200) {
       aurasMap[id] = { ...aura[id], encoded: wagoResp.data };
+      // aura.encoded = wagoResp.data
       news.push(aura.name);
     } else {
-      this.message(
+      msg(
         [
-          this.$t(
+          tr(
             "app.main.stringReceiveError-1",
             {
               aura: aura.name,
             } /* Error receiving encoded string for {aura} */
           ),
-          this.$t(
+          tr(
             "app.main.stringReceiveError-2",
             {
               status: wagoResp.status,
