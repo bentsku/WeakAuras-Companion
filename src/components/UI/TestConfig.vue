@@ -5,19 +5,19 @@
     {{ accounts }} <br />
     {{ addOnsInstalled }} <br />
     <button
-      v-for="version in versions"
-      :key="version"
-      @click="selectVersion(version)"
+      v-for="{ value, text } in versionsLabels"
+      :key="value"
+      @click="selectVersion(value)"
     >
-      {{ version }}
+      {{ text }}
     </button>
     <div v-if="versionSelected">
       <button
-        v-for="account in accountList"
-        :key="account"
-        @click="selectAccount(account)"
+        v-for="{ value } in accountsLabels"
+        :key="value"
+        @click="selectAccount(value)"
       >
-        {{ account }}
+        {{ value }}
       </button>
     </div>
     <span>Cachekey: {{ cacheKey }} </span>
@@ -253,6 +253,42 @@ export default {
   computed: {
     accountList() {
       return this.accounts[this.versionSelected] || [];
+    },
+    accountsLabels() {
+      return this.accountList.map((account) => {
+        return { value: account, text: account };
+      });
+    },
+    versionsLabels() {
+      const versionLabels = [
+        {
+          value: "_retail_",
+          text: this.$t("app.version.retail" /* Retail */),
+        },
+        {
+          value: "_ptr_",
+          text: this.$t("app.version.ptr" /* PTR */),
+        },
+        {
+          value: "_classic_beta_",
+          text: this.$t("app.version.classicbeta" /* Classic Beta */),
+        },
+        {
+          value: "_classic_ptr_",
+          text: this.$t("app.version.classicptr" /* Classic PTR */),
+        },
+        {
+          value: "_classic_",
+          text: this.$t("app.version.classic" /* Classic */),
+        },
+        {
+          value: "_beta_",
+          text: this.$t("app.version.beta" /* Beta */),
+        },
+      ];
+      return versionLabels.filter((version) =>
+        this.versions.includes(version.value)
+      );
     },
     accountHash() {
       if (this.versionSelected && this.accountSelected) {
