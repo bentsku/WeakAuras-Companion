@@ -32,15 +32,37 @@ const isWowFolderValid = (wowPath) => {
   }
 };
 
-const getVersions = async (wowpath) => {
+const getVersions = (wowpath) => {
   try {
     const files = fs.readdirSync(wowpath);
 
-    return files.filter(
-      (versionDir) =>
+    return files.filter((versionDir) => {
+      if (
         versionDir.match(/^_.*_$/) &&
         fs.statSync(path.join(wowpath, versionDir)).isDirectory()
-    );
+      ) {
+        const accountFolder = path.join(wowpath, versionDir, "WTF", "Account");
+        return fs.existsSync(accountFolder);
+      }
+    });
+  } catch {
+    return [];
+  }
+};
+
+const asyncGetVersions = async (wowpath) => {
+  try {
+    const files = await fsasync.readdir(wowpath);
+
+    return files.filter(async (versionDir) => {
+      if (
+        versionDir.match(/^_.*_$/) &&
+        (await fsasync.stat(path.join(wowpath, versionDir)).isDirectory())
+      ) {
+        const accountFolder = path.join(wowpath, versionDir, "WTF", "Account");
+        return fs.existsSync(accountFolder);
+      }
+    });
   } catch {
     return [];
   }
@@ -63,7 +85,7 @@ const getAccounts = (wowpath, version) => {
   }
 };
 
-export const getAddonLuaFilePath = (wowPath, version, account, addon) => {
+export const getAddonLuaFilePath = ({ wowPath, version, account, addon }) => {
   let addonSavedVariablesLuaFile = path.join(
     wowPath,
     version,

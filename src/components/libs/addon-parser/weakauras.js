@@ -1,8 +1,11 @@
+const luaparse = require("luaparse");
+
 const WeakAurasParser = {
-  parse(WeakAurasSavedData, config) {
+  parse(weakAurasSavedDataFile) {
+    const luaData = luaparse.parse(weakAurasSavedDataFile);
     const aurasFromFile = [];
 
-    if (WeakAurasSavedData.body[0].variables[0].name !== "WeakAurasSaved") {
+    if (luaData.body[0].variables[0].name !== "WeakAurasSaved") {
       this.message(
         this.$t(
           "app.main.errorSavedvariable" /* Error while reading WeakAuras.lua */
@@ -14,15 +17,15 @@ const WeakAurasParser = {
     // throw error for that !!
 
     // Set all auras topLevel = null to avoid bugs after user move his auras // TODO ?????? shouldnt be here ? seems to be work around ??
-    this.auras
-      .filter((aura) => aura.auraType === config.addonName)
-      .forEach((aura, index) => {
-        this.auras[index].topLevel = null;
-      });
+    // this.auras
+    //   .filter((aura) => aura.auraType === config.addonName)
+    //   .forEach((aura, index) => {
+    //     this.auras[index].topLevel = null;
+    //   });
 
     const pattern = /(https:\/\/wago.io\/)([^/]+)/;
 
-    WeakAurasSavedData.body[0].init[0].fields.forEach((obj) => {
+    luaData.body[0].init[0].fields.forEach((obj) => {
       if (obj.key.value === "displays") {
         obj.value.fields.forEach((obj2) => {
           let slug;
@@ -101,3 +104,5 @@ const WeakAurasParser = {
     return aurasFromFile;
   },
 };
+
+export default WeakAurasParser;

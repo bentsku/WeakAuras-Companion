@@ -6,21 +6,18 @@ import axios from "axios";
 axios.defaults.timeout = 15000;
 
 const mergeAllSavedVariablesData = (addonConfigs, message) => {
-  const configWithPathAndParser = addonConfigs
-    .map((addonConf) => {
-      return {
-        parser: ParserFactory.get(addonConf.name),
-        path: getAddonLuaFilePath(addonConf.name),
-      };
-    })
-    .filter((conf) => conf.parser && conf.path);
+  return addonConfigs.reduce((acc, addonConf) => {
+    const parser = ParserFactory.get(addonConf.name);
+    const savedVariablePath = getAddonLuaFilePath(addonConf.name);
 
-  return configWithPathAndParser.reduce((acc, conf) => {
+    if (!parser || !savedVariablePath) return acc;
+
     try {
-      const data = fs.readFileSync(conf.path, "utf-8");
+      const data = fs.readFileSync(savedVariablePath, "utf-8");
       // Parse saved data .lua
       const savedData = luaparse.parse(data);
-      acc.push(conf.parser(savedData));
+      const parsedAuras = parser(savedData);
+      acc.push(parsedAuras);
       return acc;
     } catch (err) {
       message(`An error ocurred reading file: ${err.message}`, "error");
@@ -107,6 +104,33 @@ const getAuraRawEncoded = (slug, wagoApiKey) => {
     }));
 };
 
+const isTopLevel = (aura) => aura.topLevel || aura.regionType !== "group";
+
+const compareVersion = (aura, wagoAura) => {
+  return (
+    wagoAura.version > aura.version &&
+    !!wagoAura.wagoVersion &&
+    wagoAura.version > aura.wagoVersion
+  );
+};
+
+const isOwnAura = (aura, username) => {
+  return !!aura.author && aura.author === username;
+};
+
+const needFetch = ({
+  aura,
+  wagoAura,
+  config: { ignoreOwnAuras, wagoUsername },
+}) => {
+  return (
+    !aura.ignoreWagoUpdate &&
+    isTopLevel(aura) &&
+    !(ignoreOwnAuras && isOwnAura(aura, wagoUsername)) &&
+    (aura.encoded === null || compareVersion(aura, wagoAura))
+  );
+};
+
 const getWagoData = async (
   addonConfigs,
   auraObject,
@@ -121,12 +145,11 @@ const getWagoData = async (
   addonConfigs.forEach(async (addonConf) => {
     const aurasToFetch = auras.reduce((accumulator, aura) => {
       if (
+        aura.auraType === addonConf.addonName &&
         !(
           globalSettings.ignoreOwnAuras &&
-          !!aura.author &&
-          aura.author === globalSettings.wagoUsername
-        ) &&
-        aura.auraType === addonConf.addonName
+          isOwnAura(aura, globalSettings.wagoUsername)
+        )
       ) {
         accumulator.push(aura.slug);
       }
@@ -153,18 +176,7 @@ const getWagoData = async (
         }
 
         // Check if encoded string needs to be fetched
-        if (
-          !aura.ignoreWagoUpdate &&
-          (aura.topLevel || aura.regionType !== "group") &&
-          (aura.encoded === null ||
-            (wagoAura.version > aura.version &&
-              !!aura.wagoVersion &&
-              wagoAura.version > aura.wagoVersion)) &&
-          !(
-            globalSettings.ignoreOwnAuras &&
-            wagoAura.username === globalSettings.wagoUsername
-          )
-        ) {
+        if (needFetch({ aura, wagoAura, globalSettings })) {
           // push promise ?
           pendingPromisesWagoEncoded.push(
             getAuraRawEncoded(aura.slug, globalSettings.wagoApiKey)
@@ -189,13 +201,12 @@ const getWagoData = async (
     console.log(`no data received for ${slug}`);
   });
 
-  return pendingPromisesWagoEncoded;
+  return await Promise.all(pendingPromisesWagoEncoded);
 };
 
-const updateAurasEncodedString = async (pendingPromises, aurasMap, msg, tr) => {
+const updateAurasEncodedString = async (wagoResponses, aurasMap, msg, tr) => {
   const news = [];
   const fails = [];
-  const wagoResponses = await Promise.all(pendingPromises);
 
   wagoResponses.forEach((wagoResp) => {
     const { id } = wagoResp.config.params;
@@ -228,3 +239,16 @@ const updateAurasEncodedString = async (pendingPromises, aurasMap, msg, tr) => {
   });
   return { auras: aurasMap, news, fails };
 };
+
+const createCacheKey = (version, account) => {
+  return `${version}:${account}`;
+};
+
+/*
+TODO: Set auras in an object, the key is version:account
+So it would be only one level depth
+then one level for slugs
+
+need to create a migrate tool for that, shouldn't be too hard ?
+access that object with a computed prop key ?
+*/

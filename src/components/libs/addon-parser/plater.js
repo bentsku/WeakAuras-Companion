@@ -1,8 +1,11 @@
+const luaparse = require("luaparse");
+
 const PlaterParser = {
-  parse(PlaterSavedData, config) {
+  parse(platerSavedDataFile) {
+    const luaData = luaparse.parse(platerSavedDataFile);
     const aurasFromFile = [];
 
-    if (PlaterSavedData.body[0].variables[0].name !== "PlaterDB") {
+    if (luaData.body[0].variables[0].name !== "PlaterDB") {
       this.message(
         this.$t(
           "app.main.errorSavedvariablePlater" /* Error while reading Plater.lua */
@@ -15,7 +18,7 @@ const PlaterParser = {
 
     const pattern = /(https:\/\/wago.io\/)([^/]+)/;
 
-    PlaterSavedData.body[0].init[0].fields.forEach((obj) => {
+    luaData.body[0].init[0].fields.forEach((obj) => {
       if (obj.key.value === "profiles") {
         obj.value.fields.forEach((profile) => {
           let profslug;
@@ -162,3 +165,5 @@ const PlaterParser = {
     return aurasFromFile;
   },
 };
+
+export default PlaterParser;
