@@ -1,4 +1,6 @@
 const luaparse = require("luaparse");
+luaparse.defaultOptions.comments = false;
+luaparse.defaultOptions.scope = true;
 
 const WeakAurasParser = {
   parse(weakAurasSavedDataFile) {
@@ -14,6 +16,7 @@ const WeakAurasParser = {
       );
       return [];
     }
+    // throw Error("errorSavedVariablesWeakAurasSaved");
     // throw error for that !!
 
     // Set all auras topLevel = null to avoid bugs after user move his auras // TODO ?????? shouldnt be here ? seems to be work around ??

@@ -248,6 +248,7 @@ export default {
       },
       versionSelected: "",
       accountSelected: "",
+      addonSelected: "",
     };
   },
   computed: {
@@ -310,6 +311,11 @@ export default {
 
       return ADDON_CONFIGS.filter((conf) =>
         syncGetAddonFolder(baseDir, conf.addonName)
+      );
+    },
+    addOnsSavedVariablesPath() {
+      return this.addOnsInstalled.map((addonConf) =>
+        this.getAddonLuaFilePath(addonConf.addonName)
       );
     },
     aurasSlugsByType() {
@@ -398,13 +404,14 @@ export default {
         fs.accessSync(addonSavedVariablesLuaFile, fs.constants.F_OK);
         return addonSavedVariablesLuaFile;
       } catch (e) {
-        return "";
+        return null;
       }
     },
     getAllSavedVariablesAuras(message) {
-      return this.addOnsInstalled.reduce((acc, addonConf) => {
+      return this.addOnsInstalled.reduce((acc, addonConf, index) => {
         const parser = ParserFactory.get(addonConf.addonName);
-        const savedVariablePath = this.getAddonLuaFilePath(addonConf.addonName);
+        // const savedVariablePath = this.getAddonLuaFilePath(addonConf.addonName);
+        const savedVariablePath = this.addOnsSavedVariablesPath[index];
         console.log(parser, savedVariablePath);
 
         if (!parser || !savedVariablePath) return acc;
@@ -421,7 +428,8 @@ export default {
         }
       }, []);
     },
-    async getWagoData() {
+    // getWagoData
+    async updateAurasInfosWithWago() {
       const auras = Object.values(this.auras);
       let allAurasFetched = [];
       let received = [];
@@ -523,7 +531,7 @@ export default {
           status: err.response.status,
         }));
     },
-    updateAurasEncodedString(wagoResponses, msg, tr) {
+    updateAurasEncodedString(wagoResponses) {
       const news = [];
       const fails = [];
 
@@ -536,15 +544,15 @@ export default {
           // aura.encoded = wagoResp.data
           news.push(aura.name);
         } else {
-          msg(
+          this.message(
             [
-              tr(
+              this.$t(
                 "app.main.stringReceiveError-1",
                 {
                   aura: aura.name,
                 } /* Error receiving encoded string for {aura} */
               ),
-              tr(
+              this.$t(
                 "app.main.stringReceiveError-2",
                 {
                   status: wagoResp.status,
@@ -558,6 +566,58 @@ export default {
       });
       return { auras: aurasMap, news, fails };
     },
+    message(text, type, overrideOptions = {}) {
+      const options = {
+        theme: "toasted-primary",
+        position: "bottom-right",
+        duration: 8000,
+        action: {
+          text: this.$t("app.main.close" /* Close */),
+          onClick: (e, toastObject) => {
+            toastObject.goAway(0);
+          },
+        },
+        ...overrideOptions,
+      };
+
+      let msg;
+
+      if (typeof text === "object") {
+        const div = document.createElement("div");
+        div.className = "msg";
+        div.innerHTML += text[0];
+
+        for (let i = 1; i < text.length; i += 1) {
+          const line = document.createElement("span");
+          line.className = "small-text";
+          line.innerHTML += text[i];
+          div.appendChild(line);
+        }
+
+        options.className = options.className
+          ? `${options.className} multiline`
+          : "multiline";
+        msg = div;
+      } else {
+        msg = text;
+      }
+
+      if (type === "info") return this.$toasted.info(msg, options);
+
+      if (type === "error") return this.$toasted.error(msg, options);
+      return this.$toasted.show(msg, options);
+    },
+    open(link) {
+      this.$electron.shell.openExternal(link);
+    },
   },
 };
+// Set all auras topLevel = null to avoid bugs after user move his auras // TODO ?????? shouldnt be here ? seems to be work around ??
+// only for weakauras, before parsing
+// as I reparsed and dont use the cache for rewriting top level, shouldnt bug anymore because using fresh data from SV
+// this.auras
+//   .filter((aura) => aura.auraType === config.addonName)
+//   .forEach((aura, index) => {
+//     this.auras[index].topLevel = null;
+//   });
 </script>

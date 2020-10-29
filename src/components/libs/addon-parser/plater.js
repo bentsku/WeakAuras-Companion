@@ -1,4 +1,6 @@
 const luaparse = require("luaparse");
+luaparse.defaultOptions.comments = false;
+luaparse.defaultOptions.scope = true;
 
 const PlaterParser = {
   parse(platerSavedDataFile) {
@@ -15,6 +17,7 @@ const PlaterParser = {
       //this.fetching = false;
       return;
     }
+    // throw Error("errorSavedVariablesPlater");
 
     const pattern = /(https:\/\/wago.io\/)([^/]+)/;
 

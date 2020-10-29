@@ -91,7 +91,9 @@ export function syncMatchFolderNameInsensitive(folder, name, create) {
     if (folderFound) return folderFound;
 
     if (!!create) {
-      fs.mkdir(path.join(folder, name), (err) => {
+      try {
+        fs.mkdirSync(path.join(folder, name));
+      } catch (err) {
         if (err && err.code !== "EEXIST") {
           this.message(
             this.$t(
@@ -102,7 +104,7 @@ export function syncMatchFolderNameInsensitive(folder, name, create) {
           console.log(JSON.stringify(err));
           throw new Error("errorCantCreateAddon");
         }
-      });
+      }
       return name;
     }
   } catch (err) {
