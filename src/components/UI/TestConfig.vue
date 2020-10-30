@@ -229,6 +229,11 @@ function syncGetAddonFolder(baseDir, addonName, create = false) {
   }
   return addonFolder;
 }
+// TODO
+// need to add the write part into this page
+// manage the notification part
+// maybe create message templates ?
+// check redundancy
 
 export default {
   name: "TestConfig",
@@ -388,9 +393,10 @@ export default {
     // DONT FORGET TO MERGE WITH CACHED DATA
     // when getting Cache data, need to be frozen?
     // then fetch
-    // then write
+    // then write -> NEED TEST WRITE / COMPARE FILE BETWEEN VERSION ? add a test on a filepath
     // save cache
     // then ? try backup I guess.
+    //
   },
   methods: {
     selectVersion(version) {
