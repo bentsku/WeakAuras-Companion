@@ -34,8 +34,8 @@
         </thead>
         <tbody>
           <tr v-for="(aura, slug) in auras" :key="aura.slug">
-            <td>{{ aura.id }}</td>
-            <td>{{ slug }}</td>
+            <td>{{ slug }}/{{ aura.id }}</td>
+            <td>{{ aura.encoded ? "encoded" : "empty" }}</td>
             <td>{{ aura.auraType }}</td>
             <td>{{ aura.wagoVersion }}</td>
           </tr>
@@ -50,6 +50,7 @@ const fs = require("fs");
 const path = require("path");
 import { ParserFactory } from "../libs/addon-parser";
 const hash = require("../libs/hash.js");
+const cache = require("../libs/cache.js");
 
 const getVersions = (wowpath) => {
   try {
@@ -137,28 +138,26 @@ const organizeAuraBySlug = (parsedAddonData) => {
   return joinBySlug(parsedAddonData);
 };
 
-const updateAuraInfoFromWago = (aura, auraInfo) => {
+const mergeAuraInfoFromWago = ({ aura, wagoAura, encoded }) => {
   return {
     ...aura,
-    name: auraInfo.name,
-    author: auraInfo.username,
-    created: new Date(auraInfo.created),
-    wagoSemver: auraInfo.versionString,
-    changelog: auraInfo.changelog,
-    modified: new Date(auraInfo.modified),
-    regionType: auraInfo.regionType,
-    wagoid: auraInfo._id,
+    name: wagoAura.name,
+    author: wagoAura.username,
+    created: new Date(wagoAura.created),
+    wagoSemver: wagoAura.versionString,
+    wagoVersion: wagoAura.version,
+    changelog: wagoAura.changelog,
+    modified: new Date(wagoAura.modified),
+    regionType: wagoAura.regionType,
+    wagoid: wagoAura._id,
+    encoded: encoded,
   };
 };
 
 const isTopLevel = (aura) => aura.topLevel || aura.regionType !== "group";
 
 const compareVersion = (aura, wagoAura) => {
-  return (
-    wagoAura.version > aura.version &&
-    !!wagoAura.wagoVersion &&
-    wagoAura.version > aura.wagoVersion
-  );
+  return wagoAura.version > aura.version && wagoAura.version > aura.wagoVersion;
 };
 
 const isOwnAura = (aura, username) => {
@@ -243,9 +242,9 @@ export default {
       cacheState: {
         versionSelected: "",
         accountSelectedByVersion: {},
-        auras: {},
         accountsData: {},
       },
+      cacheAuras: {},
       versionSelected: "",
       accountSelected: "",
       addonSelected: "",
@@ -326,22 +325,32 @@ export default {
         return acc;
       }, {});
     },
+    // allow to cache the parsed auras when changing account. Need to check with it
+    // if need to refetch, but i guess some minutes would be good
+    // not the encoded string cache
     cachedAuras() {
-      return this.cacheState.auras[this.cacheKey];
+      return this.cacheAuras[this.cacheKey];
     },
   },
   watch: {
     cacheKey: function (newVal, oldVal) {
       console.log(newVal, oldVal);
-      const cached = this.cacheState.auras[newVal];
+      const cached = this.cacheAuras[newVal];
 
       if (cached) this.auras = cached;
 
       const auras = this.getAllSavedVariablesAuras(console.log);
       this.auras = organizeAuraBySlug(auras);
       // this.getWagoData();
-
-      this.cacheState.auras = { ...this.cacheState.auras, newVal: this.auras };
+      // cache it after everything ??
+      this.cacheAuras = { ...this.cacheAuras, [newVal]: this.auras };
+    },
+    cacheState: {
+      handler(newVal) {
+        console.log("update config");
+        cache.default.setCacheConfig(newVal);
+      },
+      deep: true,
     },
   },
   mounted() {
@@ -374,6 +383,14 @@ export default {
     this.accountSelected = this.cacheState.accountSelectedByVersion[
       this.versionSelected
     ];
+
+    // this.getAllSavedVariablesAuras()
+    // DONT FORGET TO MERGE WITH CACHED DATA
+    // when getting Cache data, need to be frozen?
+    // then fetch
+    // then write
+    // save cache
+    // then ? try backup I guess.
   },
   methods: {
     selectVersion(version) {
@@ -422,7 +439,11 @@ export default {
           acc.push(...parsedAuras);
           return acc;
         } catch (err) {
-          message(`An error occurred reading file: ${err.message}`, "error");
+          // TODO CORRECT THIS, ITS WRONG
+          this.message(
+            `An error ocurred reading file: ${err.message}`,
+            "error"
+          );
           console.log(JSON.stringify(err));
           return acc;
         }
@@ -434,10 +455,12 @@ export default {
       let allAurasFetched = [];
       let received = [];
       const pendingPromisesWagoEncoded = [];
+      const cachedAuras = this.getCachedAuras();
 
       this.addOnsInstalled.forEach(async (addonConf) => {
         const aurasToFetch = auras.reduce((accumulator, aura) => {
           if (
+            aura.auraType === addonConf.addonName &&
             !(
               this.config.ignoreOwnAuras &&
               isOwnAura(aura, this.config.wagoUsername)
@@ -458,27 +481,15 @@ export default {
           );
 
           wagoAuras.forEach((wagoAura) => {
-            received.push(wagoAura.slug);
-            const aura = this.auras[wagoAura.slug];
-
-            if (aura) {
-              this.auras[wagoAura.slug] = updateAuraInfoFromWago(
-                aura,
-                wagoAura
-              );
-            }
+            const { slug } = wagoAura;
+            received.push(slug);
+            const aura = mergeAuraWithCache(slug, cachedAuras[slug]);
 
             // Check if encoded string needs to be fetched
             if (needFetch({ aura, wagoAura, config: this.config })) {
+              const promise = this.fetchAndUpdateRawEncoded(aura, wagoAura);
               // push promise ?
-              pendingPromisesWagoEncoded.push(
-                this.getAuraRawEncoded(aura.slug)
-              );
-
-              this.auras[wagoAura.slug] = {
-                ...aura,
-                wagoVersion: wagoAura.version,
-              };
+              pendingPromisesWagoEncoded.push(promise);
             }
           });
         } catch (err) {
@@ -486,13 +497,18 @@ export default {
           console.log(err);
         }
       });
-      const notReceived = allAurasFetched.filter((slug) =>
-        received.includes(slug)
-      );
 
-      notReceived.forEach((slug) => {
-        delete this.auras[slug];
-        console.log(`no data received for ${slug}`);
+      allAurasFetched.forEach((slug) => {
+        if (!received.includes(slug)) {
+          // this.auras = Object.keys(this.auras).reduce((auras, vslug) => {
+          //   if (vslug !== slug) {
+          //     auras[slug] = this.auras[slug];
+          //   }
+          //   return auras;
+          // }, {});
+          this.$delete(this.auras, slug);
+          console.log(`no data received for ${slug}`);
+        }
       });
 
       if (pendingPromisesWagoEncoded.length === 0) return [];
@@ -514,57 +530,80 @@ export default {
     },
 
     getAuraRawEncoded(slug) {
-      return this.$http
-        .get("https://data.wago.io/api/raw/encoded", {
-          params: {
-            // eslint-disable-next-line no-underscore-dangle
-            id: slug,
-          },
-          headers: {
-            Identifier: this.accountHash,
-            "api-key": this.config.wagoApiKey || "",
-          },
-          crossdomain: true,
-        })
-        .catch((err) => ({
-          config: { params: { id: err.config.params.id } },
-          status: err.response.status,
-        }));
-    },
-    updateAurasEncodedString(wagoResponses) {
-      const news = [];
-      const fails = [];
-
-      wagoResponses.forEach((wagoResp) => {
-        const { id } = wagoResp.config.params;
-        const aura = this.auras[id];
-
-        if (wagoResp.status === 200) {
-          this.auras[id] = { ...aura[id], encoded: wagoResp.data };
-          // aura.encoded = wagoResp.data
-          news.push(aura.name);
-        } else {
-          this.message(
-            [
-              this.$t(
-                "app.main.stringReceiveError-1",
-                {
-                  aura: aura.name,
-                } /* Error receiving encoded string for {aura} */
-              ),
-              this.$t(
-                "app.main.stringReceiveError-2",
-                {
-                  status: wagoResp.status,
-                } /* http code: {status} */
-              ),
-            ],
-            "error"
-          );
-          fails.push(aura.name);
-        }
+      return this.$http.get("https://data.wago.io/api/raw/encoded", {
+        params: {
+          id: slug,
+        },
+        headers: {
+          Identifier: this.accountHash,
+          "api-key": this.config.wagoApiKey || "",
+        },
+        crossdomain: true,
       });
-      return { auras: aurasMap, news, fails };
+    },
+    async fetchAndUpdateRawEncoded(aura, wagoAura) {
+      try {
+        const { data: encoded, status } = await this.getAuraRawEncoded(
+          aura.slug
+        );
+
+        this.auras[aura.slug] = mergeAuraInfoFromWago({
+          aura,
+          wagoAura,
+          encoded,
+        });
+        cacheWagoAnswer(aura.slug);
+        return { status: "success", slug: aura.slug };
+      } catch (err) {
+        this.message(
+          [
+            this.$t(
+              "app.main.stringReceiveError-1",
+              {
+                aura: aura.name,
+              } /* Error receiving encoded string for {aura} */
+            ),
+            this.$t(
+              "app.main.stringReceiveError-2",
+              {
+                status,
+              } /* http code: {status} */
+            ),
+          ],
+          "error"
+        );
+        return { status: "error", slug: aura.slug };
+      }
+    },
+    updateAuraEncodedString(slug, wagoAura, encoded) {
+      this.auras[slug] = updateAuraInfoFromWago({
+        aura,
+        wagoAura,
+        encoded,
+      });
+    },
+    cacheWagoAnswer(aura) {
+      const cachedAura = {
+        encoded: aura.encoded,
+        wagoVersion: aura.wagoVersion,
+        wagoSemver: aura.wagoSemver,
+        wagoid: aura.wagoid,
+      };
+      cache.default.setAura(this.cacheKey, cachedAura);
+    },
+    getCachedAuras() {
+      return cache.default.getCacheAurasByKey(this.cacheKey, {});
+    },
+    mergeAuraWithCache(slug, cache) {
+      const aura = this.auras[slug];
+
+      if (!cache.encoded) return aura;
+
+      this.auras[slug] = {
+        ...aura,
+        ...cache,
+      };
+      return aura;
     },
     message(text, type, overrideOptions = {}) {
       const options = {
@@ -603,8 +642,7 @@ export default {
       }
 
       if (type === "info") return this.$toasted.info(msg, options);
-
-      if (type === "error") return this.$toasted.error(msg, options);
+      else if (type === "error") return this.$toasted.error(msg, options);
       return this.$toasted.show(msg, options);
     },
     open(link) {

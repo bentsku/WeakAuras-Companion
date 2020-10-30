@@ -112,7 +112,7 @@ const isTopLevel = (aura) => aura.topLevel || aura.regionType !== "group";
 const compareVersion = (aura, wagoAura) => {
   return (
     wagoAura.version > aura.version &&
-    !!wagoAura.wagoVersion &&
+    !!aura.wagoVersion &&
     wagoAura.version > aura.wagoVersion
   );
 };
