@@ -1821,6 +1821,7 @@ end`,
           });
         });
 
+        // REWRITE FROM HERE - refactor
         if (!noNotification)
           this.afterUpdateNotification(newInstall, news, fails);
 

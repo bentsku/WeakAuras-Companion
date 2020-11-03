@@ -2,12 +2,6 @@ const fs = require("fs");
 const fsasync = require("fs/promises");
 const wowpathTest = "/Users/benjaminsimon/Projects/Random/weakauras-dummy/WoW";
 
-// need to scan folders inside wowPath
-// check for Data
-// then scan every directory in the _*_ format in it if there's an valid account folder in it
-// if not return false ?
-//
-
 const isWowFolderValid = (wowPath) => {
   const DataFolder = path.join(wowPath, "Data");
 

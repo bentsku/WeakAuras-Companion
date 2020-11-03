@@ -433,8 +433,11 @@ const createAurasLua = (auras, stash, addonInstalled) => {
 
     let spacing = config.dataIndex ? "  " : "";
 
-    // const auras = this.aurasByAddon?[config.addonName]
-    const { luaSlugs, luaUids, luaIds } = encodeAurasData(auras, spacing);
+    const addOnAuras = auras.filter(
+      (aura) => aura.auraType === config.addonName
+    );
+
+    const { luaSlugs, luaUids, luaIds } = encodeAurasData(addOnAuras, spacing);
 
     luaAddonOutput += luaSlugs;
     luaAddonOutput += luaUids;

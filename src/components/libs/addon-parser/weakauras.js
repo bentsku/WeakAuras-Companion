@@ -1,6 +1,4 @@
-const luaparse = require("luaparse");
-luaparse.defaultOptions.comments = false;
-luaparse.defaultOptions.scope = true;
+import luaparse from "./parser.js";
 
 const WeakAurasParser = {
   parse(weakAurasSavedDataFile) {

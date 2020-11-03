@@ -154,14 +154,18 @@ const mergeAuraInfoFromWago = ({ aura, wagoAura, encoded }) => {
   };
 };
 
-const isTopLevel = (aura) => aura.topLevel || aura.regionType !== "group";
+const isTopLevel = (aura) => !!aura.topLevel || aura.regionType !== "group";
 
-const compareVersion = (aura, wagoAura) => {
+const wagoVersionIsSuperior = (aura, wagoAura) => {
   return wagoAura.version > aura.version && wagoAura.version > aura.wagoVersion;
 };
 
 const isOwnAura = (aura, username) => {
   return !!aura.author && aura.author === username;
+};
+
+const hasUpdate = (aura) => {
+  return aura.wagoVersion > aura.version && !aura.ignoreWagoUpdate;
 };
 
 const needFetch = ({
@@ -173,7 +177,7 @@ const needFetch = ({
     !aura.ignoreWagoUpdate &&
     isTopLevel(aura) &&
     !(ignoreOwnAuras && isOwnAura(aura, wagoUsername)) &&
-    (aura.encoded === null || compareVersion(aura, wagoAura))
+    (aura.encoded === null || wagoVersionIsSuperior(aura, wagoAura))
   );
 };
 
@@ -240,7 +244,6 @@ export default {
   props: ["config"],
   data() {
     return {
-      normalizedData: {},
       versions: [],
       accounts: {},
       auras: {},
@@ -322,14 +325,6 @@ export default {
         this.getAddonLuaFilePath(addonConf.addonName)
       );
     },
-    aurasSlugsByType() {
-      const auras = Object.values(this.auras);
-      return auras.reduce((acc, { auraType, slug }) => {
-        if (!acc[auraType]) acc[auraType] = [];
-        acc[auraType].push(slug);
-        return acc;
-      }, {});
-    },
     // allow to cache the parsed auras when changing account. Need to check with it
     // if need to refetch, but i guess some minutes would be good
     // not the encoded string cache
@@ -358,9 +353,12 @@ export default {
       deep: true,
     },
   },
+  // create merge cache and new ? build then compare then merge?
   mounted() {
     this.versions = getVersions(this.config.wowpath.value);
 
+    // NEED TO RELOAD CACHE STATE, THEN rebuild ?
+    // ALSO CLEAN UP THE CACHE AND STUFF
     this.cacheState.accountSelectedByVersion = this.versions.reduce(
       (acc, version) => {
         if (!acc[version]) acc[version] = "";
@@ -464,18 +462,29 @@ export default {
       const cachedAuras = this.getCachedAuras();
 
       this.addOnsInstalled.forEach(async (addonConf) => {
-        const aurasToFetch = auras.reduce((accumulator, aura) => {
+        const auraSlugsByAddon = this.aurasSlugsByType[addonConf.addonName];
+        const p = auraSlugsByAddon.reduce((acc, slug) => {
           if (
-            aura.auraType === addonConf.addonName &&
-            !(
-              this.config.ignoreOwnAuras &&
-              isOwnAura(aura, this.config.wagoUsername)
-            )
+            !this.config.ignoreOwnAuras ||
+            !isOwnAura(this.auras[slug], this.config.wagoUsername)
           ) {
-            accumulator.push(aura.slug);
+            acc.push(slug);
           }
-          return accumulator;
+          return acc;
         }, []);
+        // not sure about filter?
+        // const aurasToFetch = auras.reduce((accumulator, aura) => {
+        //   if (
+        //     aura.auraType === addonConf.addonName &&
+        //     !(
+        //       this.config.ignoreOwnAuras &&
+        //       isOwnAura(aura, this.config.wagoUsername)
+        //     )
+        //   ) {
+        //     accumulator.push(aura.slug);
+        //   }
+        //   return accumulator;
+        // }, []);
 
         if (aurasToFetch.length === 0) return;
         allAurasFetched = [...allAurasFetched, ...aurasToFetch];

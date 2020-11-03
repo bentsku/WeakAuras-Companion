@@ -95,12 +95,6 @@ export function syncMatchFolderNameInsensitive(folder, name, create) {
         fs.mkdirSync(path.join(folder, name));
       } catch (err) {
         if (err && err.code !== "EEXIST") {
-          this.message(
-            this.$t(
-              "app.main.errorCantCreateAddon" /* Can't create addon directory */
-            ),
-            "error"
-          );
           console.log(JSON.stringify(err));
           throw new Error("errorCantCreateAddon");
         }
